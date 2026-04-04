@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#050a0f">
+<title>FaceQR · Identity System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
+
+:root {
+  --bg: #050a0f;
+  --surface: #0c1520;
+  --surface2: #111d2e;
+  --border: #1a2e45;
+  --accent: #00e5ff;
+  --accent2: #7b2fff;
+  --accent3: #ff2f7b;
+  --text: #e0eaf5;
+  --text-dim: #5a7a9a;
+  --success: #00ff9d;
+  --fail: #ff3d5a;
+  --glow: 0 0 20px rgba(0,229,255,0.3);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  width: 100%; min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse at 10% 20%, rgba(0,229,255,0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 80%, rgba(123,47,255,0.07) 0%, transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none; z-index: 0;
+}
+
+.app-wrap {
+  position: relative; z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.2rem 1rem calc(2rem + var(--safe-bottom));
+}
+
+header {
+  display: flex; align-items: center; gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo-icon {
+  width: 44px; height: 44px;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+  box-shadow: var(--glow);
+  flex-shrink: 0;
+  background: rgba(0,229,255,0.05);
+  animation: pulse-border 3s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { box-shadow: var(--glow); }
+  50% { box-shadow: 0 0 40px rgba(0,229,255,0.5); }
+}
+
+.logo-text h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.logo-text h1 span { color: var(--accent); }
+.logo-text p { font-size: 0.6rem; color: var(--text-dim); font-family: 'Space Mono', monospace; letter-spacing: 0.08em; margin-top: 3px; }
+
+.status-badge {
+  margin-left: auto;
+  background: rgba(0,255,157,0.1);
+  border: 1px solid rgba(0,255,157,0.3);
+  color: var(--success);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.55rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  display: flex; align-items: center; gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.status-badge::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.tabs {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.tab-btn {
+  flex: 1;
+  background: none; border: none;
+  color: var(--text-dim);
+  font-family: 'Syne', sans-serif;
+  font-size: 0.82rem; font-weight: 600;
+  padding: 0.75rem 0.5rem;
+  border-radius: 8px;
+  cursor: pointer; transition: all 0.25s;
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  -webkit-user-select: none; user-select: none;
+  touch-action: manipulation; min-height: 48px;
+}
+
+.tab-btn.active {
+  background: var(--surface2); color: var(--accent);
+  box-shadow: var(--glow);
+  border: 1px solid rgba(0,229,255,0.2);
+}
+
+.panel { display: none; }
+.panel.active { display: block; animation: fadeIn 0.25s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 1.2rem;
+}
+
+.card-header {
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 0.6rem;
+  background: rgba(0,229,255,0.02);
+}
+
+.card-header h2 {
+  font-size: 0.72rem; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-dim); font-family: 'Space Mono', monospace;
+}
+
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  flex-shrink: 0;
+}
+
+.card-body { padding: 1.1rem; }
+
+/* Camera */
+.camera-box {
+  position: relative;
+  width: 100%; aspect-ratio: 4/3;
+  background: #000;
+  border-radius: 10px; overflow: hidden;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+}
+
+/* Android: video MUST be position absolute inside relative container */
+.camera-box video {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+
+.camera-box video.mirror { transform: scaleX(-1); }
+
+.cam-overlay {
+  position: absolute; inset: 0;
+  pointer-events: none;
+}
+
+.corner {
+  position: absolute;
+  width: 26px; height: 26px;
+  border-color: var(--accent); border-style: solid; opacity: 0.9;
+}
+.corner.tl { top: 10px; left: 10px; border-width: 2px 0 0 2px; }
+.corner.tr { top: 10px; right: 10px; border-width: 2px 2px 0 0; }
+.corner.bl { bottom: 10px; left: 10px; border-width: 0 0 2px 2px; }
+.corner.br { bottom: 10px; right: 10px; border-width: 0 2px 2px 0; }
+
+.scan-line {
+  position: absolute; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: scanAnim 2.5s ease-in-out infinite; opacity: 0.8;
+}
+@keyframes scanAnim { 0% { top: 15%; } 50% { top: 82%; } 100% { top: 15%; } }
+
+.face-oval-wrap {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.face-oval {
+  width: 44%; aspect-ratio: 3/4;
+  border: 2px dashed rgba(0,229,255,0.45);
+  border-radius: 50%;
+  animation: oval-pulse 2s ease-in-out infinite;
+}
+@keyframes oval-pulse { 0%,100% { border-color: rgba(0,229,255,0.35); } 50% { border-color: rgba(0,229,255,0.9); } }
+
+.cam-label {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  font-family: 'Space Mono', monospace; font-size: 0.55rem;
+  color: var(--accent); letter-spacing: 0.08em;
+  background: rgba(0,0,0,0.65); padding: 3px 10px; border-radius: 999px;
+  white-space: nowrap;
+}
+
+.cam-placeholder {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.5rem; color: var(--text-dim);
+  font-family: 'Space Mono', monospace; font-size: 0.65rem; text-align: center;
+}
+.cam-placeholder .big-icon { font-size: 2.2rem; opacity: 0.4; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
+  border: none; border-radius: 10px;
+  font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.85rem;
+  padding: 0.75rem 1.2rem;
+  cursor: pointer; transition: opacity 0.15s, transform 0.15s;
+  touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  min-height: 48px; width: 100%;
+}
+
+.btn-primary { background: var(--accent); color: #000; box-shadow: 0 0 18px rgba(0,229,255,0.3); }
+.btn-primary:active { opacity: 0.82; transform: scale(0.97); }
+.btn-secondary { background: transparent; color: var(--accent); border: 1px solid rgba(0,229,255,0.35); }
+.btn-secondary:active { background: rgba(0,229,255,0.08); }
+.btn-danger { background: transparent; color: var(--fail); border: 1px solid rgba(255,61,90,0.35); }
+.btn-danger:active { background: rgba(255,61,90,0.08); }
+.btn:disabled { opacity: 0.32; pointer-events: none; }
+
+.btn-row { display: flex; gap: 0.6rem; margin-bottom: 0.8rem; }
+.btn-row .btn { flex: 1; }
+
+/* QR */
+.qr-area {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 1rem; min-height: 80px; margin-bottom: 1rem;
+}
+
+.qr-box {
+  background: #fff; padding: 10px; border-radius: 10px;
+  display: none; box-shadow: 0 0 28px rgba(0,229,255,0.25);
+}
+.qr-box.show { display: block; animation: popIn 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+.qr-box canvas, .qr-box img { display: block; }
+
+.qr-info {
+  text-align: center; font-family: 'Space Mono', monospace;
+  font-size: 0.6rem; color: var(--text-dim);
+  line-height: 1.8; word-break: break-all;
+}
+.qr-info strong { color: var(--accent); display: block; margin-bottom: 2px; font-size: 0.7rem; }
+
+.qr-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  color: var(--text-dim); font-family: 'Space Mono', monospace;
+  font-size: 0.65rem; padding: 1.5rem 0; opacity: 0.5;
+}
+
+/* Registry */
+.registry-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;
+}
+.registry-header h3 {
+  font-size: 0.7rem; font-family: 'Space Mono', monospace;
+  color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase;
+}
+.count-badge {
+  background: rgba(0,229,255,0.1); color: var(--accent);
+  font-family: 'Space Mono', monospace; font-size: 0.6rem;
+  padding: 2px 10px; border-radius: 999px;
+  border: 1px solid rgba(0,229,255,0.2);
+}
+
+.registry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 0.7rem; max-height: 260px; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.reg-item {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden; cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.reg-item:active { border-color: var(--accent); transform: scale(0.95); }
+.reg-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.reg-label {
+  padding: 3px 4px; font-family: 'Space Mono', monospace;
+  font-size: 0.48rem; color: var(--text-dim); text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.reg-empty {
+  grid-column: 1/-1; text-align: center; padding: 1.5rem;
+  color: var(--text-dim); font-family: 'Space Mono', monospace;
+  font-size: 0.62rem; opacity: 0.5;
+}
+
+.divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 1rem 0; }
+
+/* Scan indicator */
+.scan-indicator {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-family: 'Space Mono', monospace; font-size: 0.6rem; color: var(--text-dim);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.6rem 0.8rem; margin-top: 0.8rem;
+}
+.si-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+.scan-indicator.scanning .si-dot { background: var(--accent); animation: blink 0.8s ease-in-out infinite; }
+.scan-indicator.found .si-dot { background: var(--success); }
+.scan-indicator.not-found .si-dot { background: var(--fail); }
+
+/* Upload */
+.upload-area {
+  border: 2px dashed var(--border); border-radius: 10px; padding: 1.2rem;
+  text-align: center; cursor: pointer; transition: all 0.2s;
+  font-family: 'Space Mono', monospace; font-size: 0.62rem; color: var(--text-dim);
+  margin-top: 0.8rem; touch-action: manipulation; min-height: 48px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem;
+}
+.upload-area:active { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.04); }
+.upload-area .up-icon { font-size: 1.6rem; opacity: 0.5; }
+
+.or-divider {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-family: 'Space Mono', monospace; font-size: 0.52rem;
+  color: var(--text-dim); margin: 0.8rem 0;
+}
+.or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* Result */
+.result-card {
+  border-radius: 14px; border: 1px solid var(--border);
+  overflow: hidden; transition: all 0.35s; margin-bottom: 1.2rem;
+}
+.result-card.success { border-color: var(--success); box-shadow: 0 0 28px rgba(0,255,157,0.2); }
+.result-card.fail    { border-color: var(--fail);    box-shadow: 0 0 28px rgba(255,61,90,0.2); }
+
+.result-header {
+  padding: 1rem 1.1rem;
+  display: flex; align-items: center; gap: 0.8rem;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.result-icon {
+  font-size: 1.7rem; width: 46px; height: 46px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px; flex-shrink: 0;
+}
+.result-icon.ok      { background: rgba(0,255,157,0.1); }
+.result-icon.no      { background: rgba(255,61,90,0.1); }
+.result-icon.waiting { background: rgba(90,122,154,0.1); font-size: 1.3rem; }
+
+.result-text h3 { font-size: 0.95rem; font-weight: 800; margin-bottom: 2px; }
+.result-text h3.ok      { color: var(--success); }
+.result-text h3.no      { color: var(--fail); }
+.result-text h3.waiting { color: var(--text-dim); }
+.result-text p { font-family: 'Space Mono', monospace; font-size: 0.6rem; color: var(--text-dim); }
+.result-body { padding: 1rem 1.1rem; background: var(--surface); }
+
+.matched-face { display: flex; gap: 1rem; align-items: center; }
+.matched-face img {
+  width: 62px; height: 62px; border-radius: 10px; object-fit: cover;
+  border: 2px solid var(--success); box-shadow: 0 0 14px rgba(0,255,157,0.3); flex-shrink: 0;
+}
+.matched-info { font-family: 'Space Mono', monospace; font-size: 0.6rem; line-height: 2; color: var(--text-dim); }
+.matched-info span { color: var(--text); }
+
+/* Manual ID */
+.id-row { display: flex; gap: 0.6rem; }
+.id-input {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.7rem 0.9rem; color: var(--text);
+  font-family: 'Space Mono', monospace;
+  font-size: 16px; /* Prevents Android auto-zoom */
+  outline: none; transition: border-color 0.2s; min-height: 48px;
+}
+.id-input:focus { border-color: var(--accent); }
+.id-row .btn { flex: 0 0 auto; width: auto; padding: 0 1.1rem; }
+
+/* Info box */
+.info-box {
+  background: rgba(0,229,255,0.05);
+  border: 1px solid rgba(0,229,255,0.15);
+  border-radius: 8px; padding: 0.7rem 0.9rem;
+  font-family: 'Space Mono', monospace; font-size: 0.6rem;
+  color: var(--text-dim); margin-bottom: 0.8rem; display: none;
+}
+
+/* Flash */
+@keyframes flashAnim { 0% { opacity: 0; } 30% { opacity: 0.75; } 100% { opacity: 0; } }
+.flash {
+  position: fixed; inset: 0;
+  background: white; pointer-events: none;
+  z-index: 9999; opacity: 0;
+}
+.flash.go { animation: flashAnim 0.45s ease forwards; }
+
+#verify-qr-input, #capture-file-input { display: none; }
+.text-mono { font-family: 'Space Mono', monospace; }
+.text-xs   { font-size: 0.62rem; }
+.text-dim  { color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<div class="flash" id="flash"></div>
+
+<div class="app-wrap">
+  <header>
+    <div class="logo-icon">🪪</div>
+    <div class="logo-text">
+      <h1>Face<span>QR</span></h1>
+      <p>BIOMETRIC · IDENTITY · SYSTEM</p>
+    </div>
+    <div class="status-badge">ONLINE</div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-capture" onclick="switchTab('capture')">
+      <span>📷</span> Capture
+    </button>
+    <button class="tab-btn" id="tab-verify" onclick="switchTab('verify')">
+      <span>🔍</span> Verify
+    </button>
+  </div>
+
+  <!-- ===== CAPTURE PANEL ===== -->
+  <div class="panel active" id="panel-capture">
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot"></div>
+        <h2>Camera · Enroll Face</h2>
+      </div>
+      <div class="card-body">
+        <div class="info-box" id="cap-info"></div>
+
+        <div class="camera-box" id="capture-box">
+          <!-- mirror class flips preview only; capture un-mirrors via canvas -->
+          <video id="capture-video" autoplay muted playsinline webkit-playsinline class="mirror"></video>
+          <div class="cam-overlay">
+            <div class="corner tl"></div><div class="corner tr"></div>
+            <div class="corner bl"></div><div class="corner br"></div>
+            <div class="face-oval-wrap"><div class="face-oval"></div></div>
+            <div class="scan-line"></div>
+            <div class="cam-label" id="cap-label">INITIALIZING...</div>
+          </div>
+          <div class="cam-placeholder" id="cap-ph">
+            <div class="big-icon">📷</div>
+            <span>Tap Start Camera</span>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btn-start-cap" onclick="startCaptureCam()">▶ Start Camera</button>
+          <button class="btn btn-danger"    id="btn-stop-cap"  onclick="stopCaptureCam()" disabled>■ Stop</button>
+        </div>
+
+        <div class="or-divider">OR PICK FROM GALLERY</div>
+        <div class="upload-area" onclick="document.getElementById('capture-file-input').click()">
+          <div class="up-icon">🖼</div>
+          <div>Select Photo from Gallery</div>
+          <div style="font-size:0.52rem;opacity:0.6;margin-top:2px;">Selfie or any face photo</div>
+        </div>
+        <!-- capture="user" hints Android to open front camera in gallery -->
+        <input type="file" id="capture-file-input" accept="image/*" onchange="handleGalleryPhoto(event)">
+
+        <div class="divider"></div>
+        <button class="btn btn-primary" id="btn-capture" onclick="doCapture()" disabled>
+          ⚡ Capture &amp; Generate QR
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot" style="background:var(--accent2);box-shadow:0 0 8px var(--accent2);"></div>
+        <h2>Generated QR Code</h2>
+      </div>
+      <div class="card-body">
+        <div class="qr-area">
+          <div class="qr-empty" id="qr-empty"><span style="font-size:2rem;">⬡</span><span>No QR yet</span></div>
+          <div class="qr-box" id="qr-display"><div id="qr-container"></div></div>
+          <div class="qr-info" id="qr-info"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btn-dl-qr"    onclick="dlQR()"    disabled>⬇ QR Code</button>
+          <button class="btn btn-secondary" id="btn-dl-photo" onclick="dlPhoto()" disabled>⬇ Photo</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot" style="background:var(--accent3);box-shadow:0 0 8px var(--accent3);"></div>
+        <h2>Enrollment Registry</h2>
+      </div>
+      <div class="card-body">
+        <div class="registry-header">
+          <h3>Enrolled Identities</h3>
+          <span class="count-badge" id="reg-count">0 enrolled</span>
+        </div>
+        <div class="registry-grid" id="reg-grid">
+          <div class="reg-empty">No identities yet. Capture a face to begin.</div>
+        </div>
+        <div class="divider"></div>
+        <button class="btn btn-danger" onclick="clearReg()" style="width:auto;padding:0.5rem 1.2rem;font-size:0.75rem;min-height:40px;">🗑 Clear All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== VERIFY PANEL ===== -->
+  <div class="panel" id="panel-verify">
+
+    <div class="result-card" id="result-card">
+      <div class="result-header">
+        <div class="result-icon waiting" id="result-icon">⏳</div>
+        <div class="result-text">
+          <h3 class="waiting" id="result-title">Awaiting Scan</h3>
+          <p id="result-sub">Scan or upload a QR code to verify identity</p>
+        </div>
+      </div>
+      <div class="result-body" id="result-body">
+        <p class="text-mono text-xs text-dim" style="text-align:center;padding:0.8rem 0;opacity:0.5;">Result will appear here</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot"></div>
+        <h2>Scan QR Code</h2>
+      </div>
+      <div class="card-body">
+        <div class="info-box" id="ver-info"></div>
+
+        <div class="camera-box" id="verify-box" style="display:none;">
+          <video id="verify-video" autoplay muted playsinline webkit-playsinline></video>
+          <div class="cam-overlay">
+            <div class="corner tl"></div><div class="corner tr"></div>
+            <div class="corner bl"></div><div class="corner br"></div>
+            <div class="scan-line"></div>
+            <div class="cam-label">POINT AT QR CODE</div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btn-start-ver" onclick="startVerifyCam()">📷 Scan with Camera</button>
+          <button class="btn btn-danger"    id="btn-stop-ver"  onclick="stopVerifyCam()" disabled style="display:none;">■ Stop</button>
+        </div>
+
+        <div class="or-divider">OR UPLOAD QR IMAGE</div>
+        <div class="upload-area" onclick="document.getElementById('verify-qr-input').click()">
+          <div class="up-icon">📤</div>
+          <div>Select QR Code Image</div>
+          <div style="font-size:0.52rem;opacity:0.6;margin-top:2px;">From gallery, downloads, or files</div>
+        </div>
+        <input type="file" id="verify-qr-input" accept="image/*" onchange="handleQRUpload(event)">
+
+        <div class="scan-indicator" id="scan-indicator">
+          <div class="si-dot"></div>
+          <span id="scan-text">Awaiting QR code input...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot" style="background:var(--accent2);box-shadow:0 0 8px var(--accent2);"></div>
+        <h2>Or Enter ID Manually</h2>
+      </div>
+      <div class="card-body">
+        <p class="text-mono text-xs text-dim" style="margin-bottom:0.8rem;">Type the ID shown below the QR code</p>
+        <div class="id-row">
+          <input class="id-input" type="text" id="manual-id" placeholder="FQR-XXXXXXXX"
+            autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+          <button class="btn btn-primary" onclick="verifyByID()" style="flex:0 0 auto;width:auto;padding:0 1.1rem;">Check</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="dot" style="background:var(--accent3);box-shadow:0 0 8px var(--accent3);"></div>
+        <h2>Registry</h2>
+      </div>
+      <div class="card-body">
+        <div class="registry-header">
+          <h3>Enrolled</h3>
+          <span class="count-badge" id="reg-count-2">0 enrolled</span>
+        </div>
+        <div class="registry-grid" id="reg-grid-2" style="max-height:160px;">
+          <div class="reg-empty">No identities enrolled yet.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+let registry = [];
+try { registry = JSON.parse(localStorage.getItem('faceqr_v2') || '[]'); } catch(e) {}
+
+let capStream   = null;
+let verStream   = null;
+let verRAF      = null;
+let curQR       = null;   // { id, ts, payload }
+let curPhoto    = null;   // dataURL
+let galleryMode = false;  // true when photo from gallery (not live cam)
+
+/* ============================================================
+   TABS
+   ============================================================ */
+function switchTab(tab) {
+  ['capture','verify'].forEach(t => {
+    document.getElementById('panel-' + t).classList.toggle('active', t === tab);
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
+  if (tab === 'verify') renderReg2();
+}
+
+/* ============================================================
+   CAPTURE — CAMERA
+   ============================================================ */
+async function startCaptureCam() {
+  showInfo('cap-info', '');
+  try {
+    // Use ideal constraints so Android picks front cam without strict errors
+    capStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    const vid = document.getElementById('capture-video');
+    vid.srcObject = capStream;
+    // Android: must call play() explicitly; may need user gesture — already in onclick
+    try { await vid.play(); } catch(_) {}
+
+    document.getElementById('cap-ph').style.display = 'none';
+    document.getElementById('cap-label').textContent = 'LIVE · ALIGN FACE IN OVAL';
+    document.getElementById('btn-start-cap').disabled = true;
+    document.getElementById('btn-stop-cap').disabled  = false;
+    document.getElementById('btn-capture').disabled   = false;
+    galleryMode = false;
+    hideInfo('cap-info');
+  } catch(e) {
+    showInfo('cap-info', '⚠ Camera error: ' + (e.message || e.name) + '. Use "Select Photo from Gallery" below.');
+  }
+}
+
+function stopCaptureCam() {
+  killStream(capStream); capStream = null;
+  const vid = document.getElementById('capture-video');
+  vid.srcObject = null;
+  document.getElementById('cap-ph').style.display    = 'flex';
+  document.getElementById('cap-label').textContent   = 'OFFLINE';
+  document.getElementById('btn-start-cap').disabled  = false;
+  document.getElementById('btn-stop-cap').disabled   = true;
+  if (!galleryMode) document.getElementById('btn-capture').disabled = true;
+}
+
+/* ============================================================
+   CAPTURE — GALLERY PHOTO
+   ============================================================ */
+function handleGalleryPhoto(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    curPhoto    = ev.target.result;
+    galleryMode = true;
+    document.getElementById('btn-capture').disabled = false;
+    // Show thumbnail
+    const ph = document.getElementById('cap-ph');
+    ph.innerHTML = `<img src="${curPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;position:absolute;inset:0;">`;
+    ph.style.display = 'block';
+    document.getElementById('cap-label').textContent = 'PHOTO LOADED · TAP CAPTURE';
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ============================================================
+   CAPTURE — TAKE PHOTO / GENERATE QR
+   ============================================================ */
+function doCapture() {
+  if (galleryMode && curPhoto && !capStream) {
+    generateQR(curPhoto);
+    return;
+  }
+  const vid = document.getElementById('capture-video');
+  if (!capStream || !vid.videoWidth) {
+    alert('Camera not ready. Start the camera first or use the gallery option.');
+    return;
+  }
+  const c = document.createElement('canvas');
+  c.width  = vid.videoWidth;
+  c.height = vid.videoHeight;
+  const ctx = c.getContext('2d');
+  // Un-mirror: CSS mirror is cosmetic only; we want the real image
+  ctx.save();
+  ctx.translate(c.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(vid, 0, 0, c.width, c.height);
+  ctx.restore();
+  doFlash();
+  generateQR(c.toDataURL('image/jpeg', 0.85));
+}
+
+function generateQR(photoDataURL) {
+  curPhoto = photoDataURL;
+  const uid     = 'FQR-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+  const ts      = new Date().toISOString();
+  const payload = JSON.stringify({ id: uid, ts, system: 'FaceQR-v1' });
+
+  const cont = document.getElementById('qr-container');
+  cont.innerHTML = '';
+  new QRCode(cont, {
+    text: payload, width: 180, height: 180,
+    colorDark: '#000000', colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.H
+  });
+
+  document.getElementById('qr-display').classList.add('show');
+  document.getElementById('qr-empty').style.display = 'none';
+  document.getElementById('qr-info').innerHTML =
+    `<strong>ID: ${uid}</strong>${new Date(ts).toLocaleString()}<br>${payload.length} byte payload`;
+
+  curQR = { id: uid, ts, payload };
+  document.getElementById('btn-dl-qr').disabled    = false;
+  document.getElementById('btn-dl-photo').disabled = false;
+
+  registry.unshift({ id: uid, ts, photo: photoDataURL, payload });
+  if (registry.length > 100) registry.pop();
+  saveReg();
+  renderReg();
+}
+
+/* ============================================================
+   DOWNLOADS
+   ============================================================ */
+function dlQR() {
+  const img = document.querySelector('#qr-container img');
+  const cvs = document.querySelector('#qr-container canvas');
+  const src = img ? img.src : (cvs ? cvs.toDataURL('image/png') : null);
+  if (src) triggerDL(src, (curQR?.id || 'qr') + '.png');
+}
+function dlPhoto() {
+  if (curPhoto) triggerDL(curPhoto, (curQR?.id || 'face') + '.jpg');
+}
+function triggerDL(data, name) {
+  const a = document.createElement('a');
+  a.href = data; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+/* ============================================================
+   REGISTRY
+   ============================================================ */
+function saveReg() {
+  try { localStorage.setItem('faceqr_v2', JSON.stringify(registry)); } catch(e) {}
+}
+
+function renderReg() {
+  const g = document.getElementById('reg-grid');
+  document.getElementById('reg-count').textContent = registry.length + ' enrolled';
+  g.innerHTML = '';
+  if (!registry.length) {
+    g.innerHTML = '<div class="reg-empty">No identities yet. Capture a face to begin.</div>';
+    return;
+  }
+  registry.forEach(e => g.appendChild(regItem(e, true)));
+}
+
+function renderReg2() {
+  const g = document.getElementById('reg-grid-2');
+  document.getElementById('reg-count-2').textContent = registry.length + ' enrolled';
+  g.innerHTML = '';
+  if (!registry.length) {
+    g.innerHTML = '<div class="reg-empty">No identities enrolled yet.</div>';
+    return;
+  }
+  registry.forEach(e => g.appendChild(regItem(e, false)));
+}
+
+function regItem(e, clickable) {
+  const el = document.createElement('div');
+  el.className = 'reg-item';
+  el.innerHTML = `<img src="${e.photo}" alt="${e.id}" loading="lazy"><div class="reg-label">${e.id}</div>`;
+  if (clickable) el.onclick = () => { switchTab('verify'); verifyIDValue(e.id); };
+  return el;
+}
+
+function clearReg() {
+  if (!confirm('Clear all enrolled identities?')) return;
+  registry = []; saveReg(); renderReg(); renderReg2();
+}
+
+/* ============================================================
+   VERIFY — CAMERA (rear cam for QR)
+   ============================================================ */
+async function startVerifyCam() {
+  hideInfo('ver-info');
+  if (typeof jsQR === 'undefined') {
+    setScan('not-found', 'jsQR not available — upload a QR image instead.');
+    return;
+  }
+  try {
+    verStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    const vid = document.getElementById('verify-video');
+    vid.srcObject = verStream;
+    try { await vid.play(); } catch(_) {}
+
+    document.getElementById('verify-box').style.display   = 'block';
+    document.getElementById('btn-start-ver').disabled     = true;
+    document.getElementById('btn-stop-ver').style.display = 'inline-flex';
+    document.getElementById('btn-stop-ver').disabled      = false;
+
+    setScan('scanning', 'Scanning… point camera at QR code');
+    startQRLoop(vid);
+  } catch(e) {
+    showInfo('ver-info', '⚠ Camera error: ' + (e.message || e.name) + '. Upload a QR image instead.');
+    setScan('not-found', 'Camera unavailable — use upload');
+  }
+}
+
+function startQRLoop(vid) {
+  const c   = document.createElement('canvas');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+
+  function tick() {
+    if (!verStream) return;
+    if (vid.readyState >= 2 && vid.videoWidth > 0) {
+      c.width = vid.videoWidth; c.height = vid.videoHeight;
+      ctx.drawImage(vid, 0, 0);
+      try {
+        const d    = ctx.getImageData(0, 0, c.width, c.height);
+        const code = jsQR(d.data, d.width, d.height, { inversionAttempts: 'dontInvert' });
+        if (code) {
+          stopVerifyCam();
+          setScan('found', 'QR detected!');
+          processQRData(code.data);
+          return;
+        }
+      } catch(_) {}
+    }
+    verRAF = requestAnimationFrame(tick);
+  }
+  verRAF = requestAnimationFrame(tick);
+}
+
+function stopVerifyCam() {
+  if (verRAF) { cancelAnimationFrame(verRAF); verRAF = null; }
+  killStream(verStream); verStream = null;
+  const vid = document.getElementById('verify-video');
+  vid.srcObject = null;
+  document.getElementById('verify-box').style.display   = 'none';
+  document.getElementById('btn-start-ver').disabled     = false;
+  document.getElementById('btn-stop-ver').style.display = 'none';
+  setScan('idle', 'Awaiting QR code input...');
+}
+
+/* ============================================================
+   VERIFY — UPLOAD QR IMAGE
+   ============================================================ */
+function handleQRUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+
+  if (typeof jsQR === 'undefined') {
+    setScan('not-found', 'jsQR not loaded — use manual ID entry.');
+    return;
+  }
+
+  setScan('scanning', 'Decoding QR from image…');
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img   = new Image();
+    img.onload  = () => {
+      // Try full size, then scaled (Android sometimes needs smaller canvas)
+      let code = null;
+      const sizes = [
+        { w: img.width,                                          h: img.height },
+        { w: Math.min(img.width, 1024), h: Math.round(img.height * Math.min(1, 1024 / img.width)) }
+      ];
+      for (const { w, h } of sizes) {
+        if (code) break;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, w, h);
+        const d = ctx.getImageData(0, 0, w, h);
+        code = jsQR(d.data, d.width, d.height, { inversionAttempts: 'attemptBoth' });
+      }
+      if (code) {
+        setScan('found', 'QR decoded');
+        processQRData(code.data);
+      } else {
+        setScan('not-found', 'No QR found in image');
+        showResult('fail', '❌', 'QR Not Readable', 'Ensure the QR is clear and fully visible in the image.');
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ============================================================
+   PROCESS QR + LOOKUP
+   ============================================================ */
+function processQRData(raw) {
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch(_) { parsed = { id: raw }; }
+  verifyIDValue(parsed.id || raw);
+}
+
+function verifyByID() {
+  const v = document.getElementById('manual-id').value.trim();
+  if (!v) return;
+  verifyIDValue(v);
+}
+
+function verifyIDValue(id) {
+  setScan('scanning', 'Looking up: ' + id);
+  setTimeout(() => {
+    const match = registry.find(e => e.id === id);
+    if (match) {
+      setScan('found', 'Identity found ✓');
+      const ts = new Date(match.ts);
+      showResult('success', '✅', 'Identity Verified', 'Match found in registry', match, ts);
+    } else {
+      setScan('not-found', 'Not found in registry');
+      showResult('fail', '❌', 'Not Recognized', 'No match for ID: ' + id);
+    }
+  }, 450);
+}
+
+function showResult(type, icon, title, sub, match, ts) {
+  const ok  = type === 'success';
+  document.getElementById('result-card').className   = 'result-card ' + (ok ? 'success' : 'fail');
+  document.getElementById('result-icon').textContent = icon;
+  document.getElementById('result-icon').className   = 'result-icon ' + (ok ? 'ok' : 'no');
+  document.getElementById('result-title').textContent = title;
+  document.getElementById('result-title').className  = ok ? 'ok' : 'no';
+  document.getElementById('result-sub').textContent  = sub;
+
+  const body = document.getElementById('result-body');
+  if (ok && match) {
+    body.innerHTML = `
+      <div class="matched-face">
+        <img src="${match.photo}" alt="${match.id}">
+        <div class="matched-info">
+          <div>ID <span>${match.id}</span></div>
+          <div>Date <span>${ts.toLocaleDateString()}</span></div>
+          <div>Time <span>${ts.toLocaleTimeString()}</span></div>
+          <div>Status <span style="color:var(--success)">✔ VALID</span></div>
+        </div>
+      </div>`;
+  } else {
+    body.innerHTML = `
+      <div style="text-align:center;padding:1.2rem 0;">
+        <div style="font-size:2.5rem;margin-bottom:0.5rem;">🚫</div>
+        <p class="text-mono text-xs" style="color:var(--fail);">
+          QR not found in registry.<br>Enroll this identity in the Capture tab first.
+        </p>
+      </div>`;
+  }
+  document.getElementById('result-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function setScan(state, text) {
+  const el = document.getElementById('scan-indicator');
+  el.className = 'scan-indicator' + (state !== 'idle' ? ' ' + state : '');
+  document.getElementById('scan-text').textContent = text;
+}
+
+function showInfo(id, msg) {
+  const el = document.getElementById(id);
+  el.style.display = 'block';
+  el.textContent   = msg;
+}
+function hideInfo(id) { document.getElementById(id).style.display = 'none'; }
+
+function killStream(stream) {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+}
+
+function doFlash() {
+  const f = document.getElementById('flash');
+  f.classList.remove('go');
+  void f.offsetWidth; // force reflow
+  f.classList.add('go');
+}
+
+/* ============================================================
+   HTTPS CHECK (camera needs HTTPS on Android)
+   ============================================================ */
+if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+  const bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ff3d5a;color:#fff;text-align:center;padding:10px 14px;font-family:monospace;font-size:0.72rem;z-index:9999;line-height:1.5;';
+  bar.innerHTML = '⚠ Camera requires HTTPS on Android. Open this file via an HTTPS URL or localhost server. Gallery upload still works.';
+  document.body.prepend(bar);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+renderReg();
+</script>
+</body>
+</html>
